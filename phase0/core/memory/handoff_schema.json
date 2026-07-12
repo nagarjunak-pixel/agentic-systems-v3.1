@@ -1,0 +1,51 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "State_Handoff_Schema",
+  "type": "object",
+  "properties": {
+    "attempted_solutions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "description": { "type": "string" },
+          "result": { "type": "string" },
+          "timestamp": { "type": "string" }
+        },
+        "required": ["description", "result"]
+      }
+    },
+    "file_diffs": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "lint_output": {
+      "type": "string"
+    },
+    "repl_vars": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "advisor_validation": {
+      "type": "object",
+      "properties": {
+        "validated": { "type": "boolean" },
+        "advisor_id": { "type": "string" },
+        "timestamp": { "type": "string" },
+        "notes": { "type": "string" }
+      },
+      "required": ["validated", "advisor_id", "timestamp"]
+    }
+  },
+  "required": [
+    "attempted_solutions",
+    "file_diffs",
+    "lint_output",
+    "repl_vars",
+    "advisor_validation"
+  ]
+}

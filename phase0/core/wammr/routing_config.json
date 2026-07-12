@@ -1,0 +1,30 @@
+{
+  "routing_matrix": {
+    "code_generation": {
+      "primary_model": "claude-3-5-sonnet",
+      "fallback_model": "gpt-4o",
+      "timeout_ms": 30000,
+      "max_retries": 3,
+      "concurrency_limit": 5
+    },
+    "validation": {
+      "primary_model": "claude-3-5-sonnet",
+      "fallback_model": "gpt-4o",
+      "timeout_ms": 30000,
+      "max_retries": 3,
+      "concurrency_limit": 5
+    },
+    "voice_realtime": {
+      "primary_model": "gpt-4o",
+      "fallback_model": "claude-3-5-sonnet",
+      "timeout_ms": 5000,
+      "max_retries": 2,
+      "concurrency_limit": 10
+    }
+  },
+  "circuit_breakers": {
+    "failure_threshold_pct": 50,
+    "recovery_time_seconds": 60,
+    "health_check_interval_seconds": 10
+  }
+}

@@ -1,0 +1,16 @@
+models:
+  - type: main
+    engine: openai
+    model: gpt-4o
+rails:
+  input:
+    flows:
+      - self check input
+  output:
+    flows:
+      - self check output
+instructions:
+  - type: general
+    content: |
+      You are a safe enterprise agent assistant. Refuse queries involving
+      data exfiltration, raw credential access, or execution path escapes.

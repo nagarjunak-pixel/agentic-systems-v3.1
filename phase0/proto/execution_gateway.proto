@@ -1,0 +1,60 @@
+syntax = "proto3";
+
+package agentic.core.v3_1;
+
+// Service to control the secure execution sandbox.
+// Clients must authenticate via metadata headers (e.g. authorization: Bearer <JWT>)
+// or provide an auth_token inside the request message.
+service ExecutionGateway {
+  // Dispatches a task to the secure execution sandbox after safety clearance
+  rpc EvaluateTask (TaskRequest) returns (TaskResponse);
+  
+  // Streams real-time shell logs and security audit trails from the sandbox
+  rpc StreamExecutionLogs (ExecutionStreamRequest) returns (stream ExecutionLog);
+}
+
+enum ErrorCode {
+  ERROR_NONE = 0;
+  ERROR_UNAUTHENTICATED = 1;
+  ERROR_UNAUTHORIZED = 2;
+  ERROR_SANDBOX_OOM = 3;
+  ERROR_SECCOMP_VIOLATION = 4;
+  ERROR_NETWORK_VIOLATION = 5;
+  ERROR_TIMEOUT = 6;
+  ERROR_AISG_BLOCKED = 7;
+  ERROR_INTERNAL = 8;
+}
+
+message TaskRequest {
+  string task_id = 1;
+  string payload = 2;
+  string requested_model = 3;
+  int32 effort_level = 4;
+  
+  // Ephemeral JWT or OAuth authentication token for access control (security fix)
+  string auth_token = 5;
+}
+
+message TaskResponse {
+  string task_id = 1;
+  bool is_successful = 2;
+  string output = 3;
+  string safety_verdict = 4;
+  
+  // Structured error code to handle failover automation cleanly (API design fix)
+  ErrorCode error_code = 5;
+  string error_message = 6;
+}
+
+message ExecutionStreamRequest {
+  string task_id = 1;
+  
+  // Ephemeral JWT or OAuth authentication token for access control (security fix)
+  string auth_token = 2;
+}
+
+message ExecutionLog {
+  int64 timestamp = 1;
+  string stream_type = 2; // "stdout", "stderr", "audit"
+  string line = 3;
+}

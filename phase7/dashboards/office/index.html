@@ -1,0 +1,817 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Office Kanban Dashboard</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #0d0e15;
+            --panel-bg: rgba(26, 29, 41, 0.7);
+            --accent-cyan: #00f3ff;
+            --accent-blue: #0088ff;
+            --accent-purple: #a100ff;
+            --accent-orange: #ff9f00;
+            --accent-green: #00ff88;
+            --text-color: #c5c6c7;
+            --text-light: #ffffff;
+            --border-color: rgba(255, 255, 255, 0.08);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            overflow: hidden;
+            width: 100vw;
+            height: 100vh;
+        }
+
+        #canvas-container {
+            width: 100%;
+            height: 100%;
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 1;
+        }
+
+        /* Glassmorphic Overlay UI */
+        .glass-panel {
+            background: var(--panel-bg);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            color: var(--text-color);
+            z-index: 10;
+            position: absolute;
+            transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
+        }
+
+        header.glass-panel {
+            top: 20px;
+            left: 20px;
+            right: 20px;
+            padding: 15px 25px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        header h1 {
+            font-size: 1.5rem;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+            background: linear-gradient(45deg, var(--accent-cyan), var(--accent-blue));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        header .subtitle {
+            font-size: 0.85rem;
+            color: rgba(255, 255, 255, 0.6);
+        }
+
+        .legend {
+            display: flex;
+            gap: 20px;
+            font-size: 0.85rem;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .legend-block {
+            width: 12px;
+            height: 12px;
+            border-radius: 3px;
+        }
+
+        .legend-block.desk { background-color: var(--accent-cyan); box-shadow: 0 0 6px var(--accent-cyan); }
+        .legend-block.wall { background-color: #3e445b; }
+
+        #sidebar {
+            top: 100px;
+            left: 20px;
+            bottom: 20px;
+            width: 320px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        #sidebar h2 {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--text-light);
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 10px;
+        }
+
+        .list-container {
+            overflow-y: auto;
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .agent-item {
+            padding: 12px;
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .agent-item:hover {
+            background: rgba(255, 255, 255, 0.05);
+            border-color: rgba(255, 255, 255, 0.15);
+        }
+
+        .agent-item.selected {
+            border-color: var(--accent-cyan);
+            background: rgba(0, 243, 255, 0.05);
+        }
+
+        .agent-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 6px;
+        }
+
+        .agent-name {
+            font-weight: 600;
+            font-size: 0.9rem;
+            color: var(--text-light);
+        }
+
+        .agent-status-badge {
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-weight: 700;
+        }
+
+        .agent-status-badge.planning { background: rgba(161, 0, 255, 0.15); color: var(--accent-purple); }
+        .agent-status-badge.building { background: rgba(0, 136, 255, 0.15); color: var(--accent-blue); }
+        .agent-status-badge.reviewing { background: rgba(255, 159, 0, 0.15); color: var(--accent-orange); }
+        .agent-status-badge.idle { background: rgba(255, 255, 255, 0.1); color: var(--text-color); }
+
+        .agent-task {
+            font-size: 0.8rem;
+            color: rgba(255, 255, 255, 0.5);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        #details-panel {
+            top: 100px;
+            right: 20px;
+            bottom: 20px;
+            width: 380px;
+            padding: 25px;
+            display: none;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        #details-panel.active {
+            display: flex;
+            animation: slideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        @keyframes slideIn {
+            from { transform: translateX(50px); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+
+        .detail-header {
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 15px;
+        }
+
+        .detail-title {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: var(--text-light);
+            margin-bottom: 5px;
+        }
+
+        .kanban-tasks-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            overflow-y: auto;
+            flex-grow: 1;
+        }
+
+        .task-card {
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .task-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .task-id {
+            font-size: 0.75rem;
+            font-weight: 700;
+            color: rgba(255, 255, 255, 0.4);
+        }
+
+        .task-priority {
+            font-size: 0.7rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            padding: 2px 6px;
+            border-radius: 4px;
+        }
+
+        .task-priority.high { background: rgba(255, 107, 107, 0.15); color: #ff6b6b; }
+        .task-priority.medium { background: rgba(255, 217, 61, 0.15); color: #ffd93d; }
+        .task-priority.low { background: rgba(78, 205, 196, 0.15); color: #4ecdc4; }
+
+        .task-title {
+            font-size: 0.85rem;
+            font-weight: 500;
+            color: var(--text-light);
+        }
+
+        .task-assignee {
+            font-size: 0.75rem;
+            color: var(--accent-cyan);
+        }
+
+        #tooltip {
+            position: absolute;
+            background: rgba(15, 17, 23, 0.85);
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 8px;
+            padding: 10px 15px;
+            color: white;
+            pointer-events: none;
+            z-index: 100;
+            display: none;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+            font-size: 0.85rem;
+        }
+
+        .controls-hint {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            font-size: 0.75rem;
+            color: rgba(255, 255, 255, 0.4);
+            z-index: 10;
+        }
+    </style>
+</head>
+<body>
+    <div id="canvas-container"></div>
+
+    <header class="glass-panel">
+        <h1>
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/></svg>
+            3D Office Dashboard
+        </h1>
+        <div class="legend">
+            <div class="legend-item"><span class="legend-block desk"></span> Agent Desks</div>
+            <div class="legend-item"><span class="legend-block wall"></span> Kanban Walls</div>
+        </div>
+        <div class="subtitle">Real-time Multi-Agent Telemetry & Kanban Layout</div>
+    </header>
+
+    <div id="sidebar" class="glass-panel">
+        <h2>Active Agents</h2>
+        <div class="list-container" id="agent-list">
+            <!-- Dynamic agent list items -->
+        </div>
+    </div>
+
+    <div id="details-panel" class="glass-panel">
+        <!-- Dynamic content for selected item -->
+    </div>
+
+    <div id="tooltip"></div>
+
+    <div class="controls-hint">
+        Left Click + Drag: Rotate | Right Click + Drag: Pan | Scroll: Zoom | Click element to focus
+    </div>
+
+    <!-- CDNs -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+
+    <script>
+        let scene, camera, renderer, controls;
+        let officeData = { desks: [], walls: [] };
+        let meshes = [];
+        let raycaster = new THREE.Raycaster();
+        let mouse = new THREE.Vector2();
+        let hoveredObject = null;
+        const tooltip = document.getElementById('tooltip');
+
+        async function init() {
+            // Scene Setup
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x0d0e15);
+            scene.fog = new THREE.FogExp2(0x0d0e15, 0.012);
+
+            // Camera
+            camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(0, 20, 35);
+
+            // Renderer
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            document.getElementById('canvas-container').appendChild(renderer.domElement);
+
+            // Controls
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            controls.maxPolarAngle = Math.PI / 2.1; // Limit underfloor view
+            controls.maxDistance = 80;
+            controls.minDistance = 5;
+
+            // Lights
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.35);
+            scene.add(ambientLight);
+
+            const floorGridLight = new THREE.DirectionalLight(0x00f3ff, 0.5);
+            floorGridLight.position.set(10, 30, 20);
+            scene.add(floorGridLight);
+
+            const spotLight = new THREE.SpotLight(0xffffff, 0.8);
+            spotLight.position.set(0, 40, 0);
+            spotLight.angle = Math.PI / 3;
+            spotLight.penumbra = 0.8;
+            spotLight.castShadow = true;
+            scene.add(spotLight);
+
+            // Create Floor Grid
+            createOfficeFloor();
+
+            // Fetch and build layouts
+            await fetchOfficeData();
+
+            window.addEventListener('resize', onWindowResize);
+            window.addEventListener('mousemove', onMouseMove);
+            window.addEventListener('click', onClick);
+
+            animate();
+        }
+
+        function createOfficeFloor() {
+            // Floor geometry
+            const floorGeo = new THREE.PlaneGeometry(60, 60);
+            const floorMat = new THREE.MeshStandardMaterial({
+                color: 0x11131c,
+                roughness: 0.8,
+                metalness: 0.2
+            });
+            const floor = new THREE.Mesh(floorGeo, floorMat);
+            floor.rotation.x = -Math.PI / 2;
+            floor.receiveShadow = true;
+            scene.add(floor);
+
+            // Add grid overlay
+            const grid = new THREE.GridHelper(60, 30, 0x00f3ff, 0x222638);
+            grid.position.y = 0.01;
+            scene.add(grid);
+        }
+
+        async function fetchOfficeData() {
+            try {
+                const response = await fetch('/api/office');
+                officeData = await response.json();
+
+                buildOffice();
+                populateAgentList(officeData.desks);
+            } catch (err) {
+                console.error("Error fetching office data:", err);
+            }
+        }
+
+        function buildOffice() {
+            // Clear existing dashboard meshes
+            meshes.forEach(m => scene.remove(m));
+            meshes = [];
+
+            // Status Color Map for desks
+            const statusColors = {
+                'planning': 0xa100ff,
+                'building': 0x0088ff,
+                'reviewing': 0xff9f00,
+                'idle': 0x7f8c8d
+            };
+
+            // Build Desks
+            officeData.desks.forEach(desk => {
+                const deskGroup = new THREE.Group();
+                deskGroup.position.set(desk.x, 0, desk.z);
+                deskGroup.userData = { ...desk, type: 'desk' };
+
+                // 1. Desk top table
+                const tableGeo = new THREE.BoxGeometry(3, 0.1, 1.8);
+                const tableMat = new THREE.MeshStandardMaterial({ color: 0x1f2330, roughness: 0.5 });
+                const table = new THREE.Mesh(tableGeo, tableMat);
+                table.position.y = 1.2;
+                table.castShadow = true;
+                table.receiveShadow = true;
+                deskGroup.add(table);
+
+                // 2. Table Legs
+                const legGeo = new THREE.CylinderGeometry(0.08, 0.08, 1.2);
+                const legMat = new THREE.MeshStandardMaterial({ color: 0x474c5f, metalness: 0.8 });
+                const legPositions = [
+                    [-1.3, 0.6, -0.7], [1.3, 0.6, -0.7],
+                    [-1.3, 0.6, 0.7], [1.3, 0.6, 0.7]
+                ];
+                legPositions.forEach(pos => {
+                    const leg = new THREE.Mesh(legGeo, legMat);
+                    leg.position.set(pos[0], pos[1], pos[2]);
+                    deskGroup.add(leg);
+                });
+
+                // 3. Monitor
+                const monitorGeo = new THREE.BoxGeometry(1.6, 0.9, 0.05);
+                const monitorColor = statusColors[desk.status.toLowerCase()] || statusColors['idle'];
+                const monitorMat = new THREE.MeshStandardMaterial({
+                    color: 0x000000,
+                    emissive: monitorColor,
+                    emissiveIntensity: desk.status.toLowerCase() !== 'idle' ? 0.3 : 0.05
+                });
+                const monitor = new THREE.Mesh(monitorGeo, monitorMat);
+                monitor.position.set(0, 1.8, -0.4);
+                deskGroup.add(monitor);
+
+                // Monitor stand
+                const standGeo = new THREE.BoxGeometry(0.1, 0.5, 0.1);
+                const stand = new THREE.Mesh(standGeo, legMat);
+                stand.position.set(0, 1.4, -0.4);
+                deskGroup.add(stand);
+
+                // 4. Floating Holographic status sphere above desk
+                const holoGeo = new THREE.SphereGeometry(0.35, 16, 16);
+                const holoMat = new THREE.MeshBasicMaterial({
+                    color: monitorColor,
+                    wireframe: true,
+                    transparent: true,
+                    opacity: 0.8
+                });
+                const holo = new THREE.Mesh(holoGeo, holoMat);
+                holo.position.set(0, 2.6, 0);
+                holo.userData = { isHolo: true };
+                deskGroup.add(holo);
+
+                scene.add(deskGroup);
+                
+                // Add a target invisible bounding box mesh to support raycasting on the whole desk unit
+                const hitGeo = new THREE.BoxGeometry(3.5, 3.2, 2.2);
+                const hitMat = new THREE.MeshBasicMaterial({ visible: false });
+                const hitMesh = new THREE.Mesh(hitGeo, hitMat);
+                hitMesh.position.set(desk.x, 1.6, desk.z);
+                hitMesh.userData = { ...desk, type: 'desk', group: deskGroup };
+                
+                scene.add(hitMesh);
+                meshes.push(hitMesh);
+            });
+
+            // Build Kanban Walls
+            officeData.walls.forEach(wall => {
+                const wallGroup = new THREE.Group();
+                wallGroup.position.set(wall.x, 0, wall.z);
+                wallGroup.userData = { ...wall, type: 'wall' };
+
+                // Determine rotation based on coordinate location
+                if (wall.x < -5) {
+                    wallGroup.rotation.y = Math.PI / 2; // Facing Right
+                } else if (wall.x > 5) {
+                    wallGroup.rotation.y = -Math.PI / 2; // Facing Left
+                } else if (wall.z > 5) {
+                    wallGroup.rotation.y = Math.PI; // Facing Back
+                }
+
+                // 1. Physical Wall Board Plane
+                const boardGeo = new THREE.BoxGeometry(7, 4.5, 0.2);
+                const boardMat = new THREE.MeshStandardMaterial({
+                    color: 0x1b1d29,
+                    roughness: 0.7,
+                    metalness: 0.1
+                });
+                const board = new THREE.Mesh(boardGeo, boardMat);
+                board.position.y = 2.25;
+                board.castShadow = true;
+                board.receiveShadow = true;
+                wallGroup.add(board);
+
+                // 2. Wall supports (two metal pillars)
+                const supportGeo = new THREE.BoxGeometry(0.3, 4.5, 0.3);
+                const supportMat = new THREE.MeshStandardMaterial({ color: 0x3e445b, metalness: 0.5 });
+                const supportLeft = new THREE.Mesh(supportGeo, supportMat);
+                supportLeft.position.set(-3.3, 2.25, 0);
+                const supportRight = new THREE.Mesh(supportGeo, supportMat);
+                supportRight.position.set(3.3, 2.25, 0);
+                wallGroup.add(supportLeft);
+                wallGroup.add(supportRight);
+
+                // 3. Status indicator light at top of board
+                const lightGeo = new THREE.BoxGeometry(1.5, 0.15, 0.3);
+                let statusColor = 0x3e445b;
+                if (wall.title.toLowerCase() === 'to do') statusColor = 0x00f3ff;
+                else if (wall.title.toLowerCase() === 'in progress') statusColor = 0x0088ff;
+                else if (wall.title.toLowerCase() === 'review') statusColor = 0xff9f00;
+                else if (wall.title.toLowerCase() === 'done') statusColor = 0x00ff88;
+
+                const lightMat = new THREE.MeshBasicMaterial({
+                    color: statusColor,
+                    transparent: true,
+                    opacity: 0.8
+                });
+                const indicator = new THREE.Mesh(lightGeo, lightMat);
+                indicator.position.set(0, 4.4, 0);
+                wallGroup.add(indicator);
+
+                // 4. Render minimal task card indicators directly on board
+                const taskCount = wall.tasks.length;
+                const cardGeo = new THREE.PlaneGeometry(1.5, 0.7);
+                const cardMat = new THREE.MeshBasicMaterial({
+                    color: 0x2e3247,
+                    side: THREE.DoubleSide
+                });
+
+                for (let i = 0; i < Math.min(taskCount, 6); i++) {
+                    const card = new THREE.Mesh(cardGeo, cardMat);
+                    // Distribute cards in a grid on the board
+                    const col = i % 3 - 1; // -1, 0, 1
+                    const row = Math.floor(i / 3); // 0, 1
+                    card.position.set(col * 1.8, 2.8 - row * 1.0, 0.11);
+                    
+                    // Task priority border indicator
+                    const prioColor = wall.tasks[i].priority === 'high' ? 0xff6b6b : wall.tasks[i].priority === 'medium' ? 0ffd93d : 0x4ecdc4;
+                    const borderGeo = new THREE.BoxGeometry(0.1, 0.7, 0.02);
+                    const borderMat = new THREE.MeshBasicMaterial({ color: prioColor });
+                    const border = new THREE.Mesh(borderGeo, borderMat);
+                    border.position.set(-0.7, 0, 0.01);
+                    card.add(border);
+
+                    wallGroup.add(card);
+                }
+
+                scene.add(wallGroup);
+
+                // Bounding hitBox for interaction
+                const hitGeo = new THREE.BoxGeometry(7, 4.5, 0.8);
+                const hitMat = new THREE.MeshBasicMaterial({ visible: false });
+                const hitMesh = new THREE.Mesh(hitGeo, hitMat);
+                hitMesh.position.copy(wallGroup.position);
+                hitMesh.position.y = 2.25;
+                hitMesh.rotation.y = wallGroup.rotation.y;
+                hitMesh.userData = { ...wall, type: 'wall', group: wallGroup };
+
+                scene.add(hitMesh);
+                meshes.push(hitMesh);
+            });
+        }
+
+        function populateAgentList(desks) {
+            const list = document.getElementById('agent-list');
+            list.innerHTML = '';
+
+            desks.forEach(desk => {
+                const div = document.createElement('div');
+                div.className = 'agent-item';
+                div.setAttribute('data-id', desk.agent_id);
+                div.innerHTML = `
+                    <div class="agent-header">
+                        <span class="agent-name">${desk.agent_name}</span>
+                        <span class="agent-status-badge ${desk.status.toLowerCase()}">${desk.status}</span>
+                    </div>
+                    <div class="agent-task">${desk.active_task || 'No active task'}</div>
+                `;
+                div.addEventListener('click', () => {
+                    selectDesk(desk);
+                });
+                list.appendChild(div);
+            });
+        }
+
+        function selectDesk(desk) {
+            // Update selection state
+            document.querySelectorAll('.agent-item').forEach(item => {
+                item.classList.remove('selected');
+                if (item.getAttribute('data-id') === desk.agent_id) {
+                    item.classList.add('selected');
+                }
+            });
+
+            // GSAP Camera zoom-to desk
+            gsap.to(controls.target, {
+                x: desk.x,
+                y: 1.5,
+                z: desk.z,
+                duration: 1.2,
+                ease: 'power2.out',
+                onUpdate: () => controls.update()
+            });
+
+            gsap.to(camera.position, {
+                x: desk.x,
+                y: 5,
+                z: desk.z + 7,
+                duration: 1.2,
+                ease: 'power2.out'
+            });
+
+            showDeskDetails(desk);
+        }
+
+        function selectWall(wall) {
+            // GSAP Camera zoom-to Wall
+            // Calculate a point in front of the wall based on its coordinate location
+            let frontX = wall.x;
+            let frontZ = wall.z;
+            if (wall.x < -5) frontX += 10;
+            else if (wall.x > 5) frontX -= 10;
+            else if (wall.z > 5) frontZ -= 10;
+            else frontZ += 10;
+
+            gsap.to(controls.target, {
+                x: wall.x,
+                y: 2.2,
+                z: wall.z,
+                duration: 1.2,
+                ease: 'power2.out',
+                onUpdate: () => controls.update()
+            });
+
+            gsap.to(camera.position, {
+                x: frontX,
+                y: 4.5,
+                z: frontZ,
+                duration: 1.2,
+                ease: 'power2.out'
+            });
+
+            showWallDetails(wall);
+        }
+
+        function showDeskDetails(desk) {
+            const panel = document.getElementById('details-panel');
+            panel.innerHTML = `
+                <div class="detail-header">
+                    <h3 class="detail-title">${desk.agent_name}</h3>
+                    <span class="agent-status-badge ${desk.status.toLowerCase()}">${desk.status}</span>
+                </div>
+                <div class="task-card" style="margin-top: 15px">
+                    <span style="font-size: 0.75rem; text-transform: uppercase; color: rgba(255,255,255,0.4)">Current Task</span>
+                    <p style="font-size: 0.95rem; color: white; font-weight: 500">${desk.active_task || 'No active tasks at the moment.'}</p>
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 5px; font-size: 0.85rem">
+                    <span style="color: rgba(255,255,255,0.4)">Desk Coordinates</span>
+                    <span style="background: rgba(255,255,255,0.03); padding: 8px; border-radius: 6px; border: 1px solid var(--border-color)">X: ${desk.x.toFixed(1)}, Y: 0.0, Z: ${desk.z.toFixed(1)}</span>
+                </div>
+            `;
+            panel.classList.add('active');
+        }
+
+        function showWallDetails(wall) {
+            const panel = document.getElementById('details-panel');
+            
+            let tasksHTML = '';
+            if (wall.tasks.length === 0) {
+                tasksHTML = `<p style="font-size: 0.9rem; text-align: center; color: rgba(255,255,255,0.3); padding: 40px 0;">No tasks in this column.</p>`;
+            } else {
+                wall.tasks.forEach(task => {
+                    tasksHTML += `
+                        <div class="task-card">
+                            <div class="task-card-header">
+                                <span class="task-id">${task.task_id}</span>
+                                <span class="task-priority ${task.priority.toLowerCase()}">${task.priority}</span>
+                            </div>
+                            <h4 class="task-title">${task.title}</h4>
+                            <div class="task-assignee">Assigned to: ${task.assigned_agent || 'Unassigned'}</div>
+                        </div>
+                    `;
+                });
+            }
+
+            panel.innerHTML = `
+                <div class="detail-header">
+                    <h3 class="detail-title">${wall.title} Board</h3>
+                    <span style="font-size: 0.8rem; color: rgba(255,255,255,0.5)">${wall.tasks.length} task(s) active</span>
+                </div>
+                <div class="kanban-tasks-list">
+                    ${tasksHTML}
+                </div>
+            `;
+            panel.classList.add('active');
+        }
+
+        // Mouse interactions
+        function onMouseMove(event) {
+            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObjects(meshes);
+
+            if (intersects.length > 0) {
+                const object = intersects[0].object;
+                if (hoveredObject !== object) {
+                    hoveredObject = object;
+                    
+                    // Show Tooltip
+                    tooltip.style.display = 'block';
+                    if (object.userData.type === 'desk') {
+                        tooltip.innerHTML = `<strong>${object.userData.agent_name}</strong><br><span style="color:var(--accent-cyan)">Desk [${object.userData.status}]</span>`;
+                    } else if (object.userData.type === 'wall') {
+                        tooltip.innerHTML = `<strong>${object.userData.title} Board</strong><br><span style="color:rgba(255,255,255,0.6)">Kanban Wall [${object.userData.tasks.length} Tasks]</span>`;
+                    }
+                }
+                tooltip.style.left = (event.clientX + 15) + 'px';
+                tooltip.style.top = (event.clientY + 15) + 'px';
+            } else {
+                hoveredObject = null;
+                tooltip.style.display = 'none';
+            }
+        }
+
+        function onClick(event) {
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObjects(meshes);
+
+            if (intersects.length > 0) {
+                const object = intersects[0].object;
+                if (object.userData.type === 'desk') {
+                    selectDesk(object.userData);
+                } else if (object.userData.type === 'wall') {
+                    selectWall(object.userData);
+                }
+            }
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            // Slow animation of floating holograms on desks
+            const elapsed = clock.getElapsedTime();
+            meshes.forEach(m => {
+                if (m.userData.type === 'desk' && m.userData.group) {
+                    const holo = m.userData.group.children.find(c => c.userData && c.userData.isHolo);
+                    if (holo) {
+                        holo.position.y = 2.6 + Math.sin(elapsed * 2.5 + m.userData.x) * 0.1;
+                        holo.rotation.y += 0.015;
+                    }
+                }
+            });
+
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        const clock = new THREE.Clock();
+        init();
+    </script>
+</body>
+</html>

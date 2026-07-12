@@ -1,0 +1,687 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Memory Galaxy - Semantic Graph UI</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #0b0c10;
+            --panel-bg: rgba(21, 23, 30, 0.7);
+            --accent-cyan: #00f3ff;
+            --accent-purple: #a100ff;
+            --accent-orange: #ffaa00;
+            --text-color: #c5c6c7;
+            --text-light: #ffffff;
+            --border-color: rgba(255, 255, 255, 0.1);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            overflow: hidden;
+            width: 100vw;
+            height: 100vh;
+        }
+
+        #canvas-container {
+            width: 100%;
+            height: 100%;
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 1;
+        }
+
+        /* Glassmorphic Overlay UI */
+        .glass-panel {
+            background: var(--panel-bg);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            color: var(--text-color);
+            z-index: 10;
+            position: absolute;
+            transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+        }
+
+        header.glass-panel {
+            top: 20px;
+            left: 20px;
+            right: 20px;
+            padding: 15px 25px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        header h1 {
+            font-size: 1.5rem;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+            background: linear-gradient(45deg, var(--accent-cyan), var(--accent-purple));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        header .subtitle {
+            font-size: 0.85rem;
+            color: rgba(255, 255, 255, 0.6);
+        }
+
+        .legend {
+            display: flex;
+            gap: 20px;
+            font-size: 0.85rem;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .legend-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            box-shadow: 0 0 8px currentColor;
+        }
+
+        .legend-dot.agent { color: var(--accent-cyan); background-color: var(--accent-cyan); }
+        .legend-dot.memory { color: var(--accent-purple); background-color: var(--accent-purple); }
+        .legend-dot.folder { color: var(--accent-orange); background-color: var(--accent-orange); }
+
+        #sidebar {
+            top: 100px;
+            left: 20px;
+            bottom: 20px;
+            width: 320px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            overflow-y: auto;
+        }
+
+        #sidebar h2 {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--text-light);
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 10px;
+        }
+
+        .search-box {
+            width: 100%;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 10px 15px;
+            color: var(--text-light);
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .search-box:focus {
+            border-color: var(--accent-cyan);
+        }
+
+        .node-list {
+            list-style: none;
+            overflow-y: auto;
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .node-item {
+            padding: 10px 12px;
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid transparent;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .node-item:hover {
+            background: rgba(255, 255, 255, 0.05);
+            border-color: rgba(255, 255, 255, 0.15);
+        }
+
+        .node-item.selected {
+            background: rgba(0, 243, 255, 0.1);
+            border-color: var(--accent-cyan);
+        }
+
+        .node-item-title {
+            font-weight: 500;
+            font-size: 0.9rem;
+            color: var(--text-light);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 180px;
+        }
+
+        .node-item-type {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-weight: 600;
+        }
+
+        .node-item-type.desk { background: rgba(0, 243, 255, 0.15); color: var(--accent-cyan); }
+        .node-item-type.node { background: rgba(161, 0, 255, 0.15); color: var(--accent-purple); }
+        .node-item-type.folder { background: rgba(255, 170, 0, 0.15); color: var(--accent-orange); }
+
+        #details-panel {
+            top: 100px;
+            right: 20px;
+            width: 350px;
+            padding: 25px;
+            display: none;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        #details-panel.active {
+            display: flex;
+            animation: slideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        @keyframes slideIn {
+            from { transform: translateX(50px); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+
+        .detail-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 15px;
+        }
+
+        .detail-title {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: var(--text-light);
+            margin-bottom: 5px;
+        }
+
+        .detail-badge {
+            font-size: 0.75rem;
+            font-weight: 700;
+            padding: 4px 8px;
+            border-radius: 6px;
+            text-transform: uppercase;
+        }
+
+        .detail-badge.desk { background: rgba(0, 243, 255, 0.2); color: var(--accent-cyan); border: 1px solid var(--accent-cyan); }
+        .detail-badge.node { background: rgba(161, 0, 255, 0.2); color: var(--accent-purple); border: 1px solid var(--accent-purple); }
+        .detail-badge.folder { background: rgba(255, 170, 0, 0.2); color: var(--accent-orange); border: 1px solid var(--accent-orange); }
+
+        .detail-row {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .detail-label {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: rgba(255, 255, 255, 0.4);
+        }
+
+        .detail-value {
+            font-size: 0.95rem;
+            color: var(--text-light);
+            background: rgba(255, 255, 255, 0.02);
+            padding: 8px 12px;
+            border-radius: 6px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        #tooltip {
+            position: absolute;
+            background: rgba(15, 17, 23, 0.85);
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 8px;
+            padding: 10px 15px;
+            color: white;
+            pointer-events: none;
+            z-index: 100;
+            display: none;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+            font-size: 0.85rem;
+        }
+
+        /* Ambient styling */
+        .controls-hint {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            font-size: 0.75rem;
+            color: rgba(255, 255, 255, 0.4);
+            z-index: 10;
+        }
+    </style>
+</head>
+<body>
+    <div id="canvas-container"></div>
+
+    <header class="glass-panel">
+        <h1>
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
+            Memory Galaxy
+        </h1>
+        <div class="legend">
+            <div class="legend-item"><span class="legend-dot agent"></span> Agents (Desks)</div>
+            <div class="legend-item"><span class="legend-dot memory"></span> Memories (Nodes)</div>
+            <div class="legend-item"><span class="legend-dot folder"></span> Projects (Folders)</div>
+        </div>
+        <div class="subtitle">Shared Core Semantic Knowledge Graph</div>
+    </header>
+
+    <div id="sidebar" class="glass-panel">
+        <h2>Entities</h2>
+        <input type="text" class="search-box" id="search" placeholder="Search node or agent...">
+        <ul class="node-list" id="node-list">
+            <!-- Dynamic list items -->
+        </ul>
+    </div>
+
+    <div id="details-panel" class="glass-panel">
+        <!-- Details generated dynamically -->
+    </div>
+
+    <div id="tooltip"></div>
+
+    <div class="controls-hint">
+        Left Click + Drag: Rotate | Right Click + Drag: Pan | Scroll: Zoom
+    </div>
+
+    <!-- CDNs -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+
+    <script>
+        let scene, camera, renderer, controls;
+        let nodesData = [], linksData = [];
+        let meshes = [];
+        let raycaster = new THREE.Raycaster();
+        let mouse = new THREE.Vector2();
+        let hoveredObject = null;
+        const tooltip = document.getElementById('tooltip');
+
+        // Fetch data and build 3D graph
+        async function init() {
+            // Setup scene
+            scene = new THREE.Scene();
+            scene.fog = new THREE.FogExp2(0x0b0c10, 0.015);
+
+            // Camera
+            camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(0, 15, 25);
+
+            // Renderer
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            document.getElementById('canvas-container').appendChild(renderer.domElement);
+
+            // Controls
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            controls.maxDistance = 100;
+            controls.minDistance = 2;
+
+            // Lights
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.2);
+            scene.add(ambientLight);
+
+            const dirLight1 = new THREE.DirectionalLight(0x00f3ff, 0.8);
+            dirLight1.position.set(10, 20, 15);
+            scene.add(dirLight1);
+
+            const dirLight2 = new THREE.DirectionalLight(0xa100ff, 0.6);
+            dirLight2.position.set(-10, -20, -15);
+            scene.add(dirLight2);
+
+            // Background Grid / Stars
+            createStars();
+
+            // Load data
+            await fetchData();
+
+            // Handle Resize
+            window.addEventListener('resize', onWindowResize);
+            window.addEventListener('mousemove', onMouseMove);
+            window.addEventListener('click', onClick);
+
+            // Start Animation loop
+            animate();
+        }
+
+        function createStars() {
+            const starsGeometry = new THREE.BufferGeometry();
+            const starsCount = 1000;
+            const starPositions = new Float32Array(starsCount * 3);
+
+            for (let i = 0; i < starsCount * 3; i++) {
+                starPositions[i] = (Math.random() - 0.5) * 200;
+            }
+
+            starsGeometry.setAttribute('position', new THREE.BufferAttribute(starPositions, 3));
+            const starsMaterial = new THREE.PointsMaterial({
+                color: 0xffffff,
+                size: 0.1,
+                transparent: true,
+                opacity: 0.8
+            });
+
+            const starField = new THREE.Points(starsGeometry, starsMaterial);
+            scene.add(starField);
+        }
+
+        async function fetchData() {
+            try {
+                // Fetch graph JSON from endpoint
+                const response = await fetch('/api/graph');
+                const data = await response.json();
+                nodesData = data.nodes;
+                linksData = data.links;
+
+                buildGraph();
+                populateSidebar(nodesData);
+            } catch (err) {
+                console.error("Error fetching graph data:", err);
+            }
+        }
+
+        function buildGraph() {
+            // Clear existing meshes
+            meshes.forEach(m => scene.add(m)); // Keep trace
+            
+            const nodeMap = {};
+
+            // Add Node Spheres
+            nodesData.forEach(node => {
+                let size = 0.5;
+                let emissiveIntensity = 0.2;
+                let color = 0xa100ff; // Node (purple)
+
+                if (node.type === 'desk') {
+                    size = 0.9;
+                    color = 0x00f3ff; // Desk (cyan)
+                    emissiveIntensity = 0.4;
+                } else if (node.type === 'folder') {
+                    size = 0.7;
+                    color = 0xffaa00; // Folder (orange)
+                    emissiveIntensity = 0.3;
+                }
+
+                const geometry = new THREE.SphereGeometry(size, 32, 32);
+                const material = new THREE.MeshPhongMaterial({
+                    color: color,
+                    emissive: color,
+                    emissiveIntensity: emissiveIntensity,
+                    shininess: 100,
+                    transparent: true,
+                    opacity: 0.9
+                });
+
+                const sphere = new THREE.Mesh(geometry, material);
+                sphere.position.set(node.x, node.y, node.z);
+                sphere.userData = node;
+
+                // Add wireframe glow container
+                const glowGeo = new THREE.SphereGeometry(size * 1.25, 8, 8);
+                const glowMat = new THREE.MeshBasicMaterial({
+                    color: color,
+                    wireframe: true,
+                    transparent: true,
+                    opacity: 0.08
+                });
+                const glow = new THREE.Mesh(glowGeo, glowMat);
+                sphere.add(glow);
+
+                scene.add(sphere);
+                meshes.push(sphere);
+                nodeMap[node.id] = node;
+            });
+
+            // Add Link Lines
+            linksData.forEach(link => {
+                const sourceNode = nodeMap[link.source];
+                const targetNode = nodeMap[link.target];
+
+                if (sourceNode && targetNode) {
+                    const points = [
+                        new THREE.Vector3(sourceNode.x, sourceNode.y, sourceNode.z),
+                        new THREE.Vector3(targetNode.x, targetNode.y, targetNode.z)
+                    ];
+                    
+                    const lineGeo = new THREE.BufferGeometry().setFromPoints(points);
+                    const lineMat = new THREE.LineBasicMaterial({
+                        color: 0xffffff,
+                        transparent: true,
+                        opacity: 0.15
+                    });
+                    
+                    const line = new THREE.Line(lineGeo, lineMat);
+                    scene.add(line);
+                }
+            });
+        }
+
+        function populateSidebar(nodes) {
+            const list = document.getElementById('node-list');
+            list.innerHTML = '';
+            nodes.forEach(node => {
+                const li = document.createElement('li');
+                li.className = 'node-item';
+                li.setAttribute('data-id', node.id);
+                li.innerHTML = `
+                    <span class="node-item-title">${node.label}</span>
+                    <span class="node-item-type ${node.type}">${node.type}</span>
+                `;
+                li.addEventListener('click', () => {
+                    selectNode(node);
+                });
+                list.appendChild(li);
+            });
+        }
+
+        function selectNode(node) {
+            // Update active sidebar selection
+            document.querySelectorAll('.node-item').forEach(item => {
+                item.classList.remove('selected');
+                if (item.getAttribute('data-id') === node.id) {
+                    item.classList.add('selected');
+                }
+            });
+
+            // Pan camera to node smoothly
+            gsap.to(controls.target, {
+                x: node.x,
+                y: node.y,
+                z: node.z,
+                duration: 1.2,
+                ease: 'power2.out',
+                onUpdate: () => controls.update()
+            });
+
+            gsap.to(camera.position, {
+                x: node.x + 4,
+                y: node.y + 4,
+                z: node.z + 8,
+                duration: 1.2,
+                ease: 'power2.out'
+            });
+
+            showDetails(node);
+        }
+
+        function showDetails(node) {
+            const panel = document.getElementById('details-panel');
+            
+            let extraHTML = '';
+            if (node.type === 'desk') {
+                extraHTML = `
+                    <div class="detail-row">
+                        <span class="detail-label">Status</span>
+                        <span class="detail-value" style="color: var(--accent-cyan)">${node.status || 'idle'}</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Active Task</span>
+                        <span class="detail-value">${node.active_task || 'None'}</span>
+                    </div>
+                `;
+            } else if (node.type === 'node') {
+                extraHTML = `
+                    <div class="detail-row">
+                        <span class="detail-label">Kanban Status</span>
+                        <span class="detail-value">${node.status || 'backlog'}</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Priority</span>
+                        <span class="detail-value" style="color: ${node.priority === 'high' ? '#ff6b6b' : 'var(--text-color)'}">${node.priority || 'medium'}</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Assigned Agent</span>
+                        <span class="detail-value">${node.assigned_agent || 'Unassigned'}</span>
+                    </div>
+                `;
+            } else if (node.type === 'folder') {
+                extraHTML = `
+                    <div class="detail-row">
+                        <span class="detail-label">Associated Ref</span>
+                        <span class="detail-value">${node.ref_id}</span>
+                    </div>
+                `;
+            }
+
+            panel.innerHTML = `
+                <div class="detail-header">
+                    <div>
+                        <h3 class="detail-title">${node.label}</h3>
+                        <span class="detail-label">ID: ${node.id}</span>
+                    </div>
+                    <span class="detail-badge ${node.type}">${node.type}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Coordinates (X, Y, Z)</span>
+                    <span class="detail-value">${node.x.toFixed(2)}, ${node.y.toFixed(2)}, ${node.z.toFixed(2)}</span>
+                </div>
+                ${extraHTML}
+            `;
+            panel.classList.add('active');
+        }
+
+        // Raycasting & Mouse move
+        function onMouseMove(event) {
+            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+            // Highlight hovered node
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObjects(meshes);
+
+            if (intersects.length > 0) {
+                const object = intersects[0].object;
+                if (hoveredObject !== object) {
+                    if (hoveredObject) {
+                        // Reset previous
+                        hoveredObject.material.emissiveIntensity = hoveredObject.userData.type === 'desk' ? 0.4 : 0.2;
+                    }
+                    hoveredObject = object;
+                    hoveredObject.material.emissiveIntensity = 0.8;
+                    
+                    // Show Tooltip
+                    tooltip.style.display = 'block';
+                    tooltip.innerHTML = `<strong>${object.userData.label}</strong><br><span style="color:rgba(255,255,255,0.6)">Type: ${object.userData.type}</span>`;
+                }
+
+                tooltip.style.left = (event.clientX + 15) + 'px';
+                tooltip.style.top = (event.clientY + 15) + 'px';
+            } else {
+                if (hoveredObject) {
+                    hoveredObject.material.emissiveIntensity = hoveredObject.userData.type === 'desk' ? 0.4 : 0.2;
+                    hoveredObject = null;
+                }
+                tooltip.style.display = 'none';
+            }
+        }
+
+        function onClick(event) {
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObjects(meshes);
+
+            if (intersects.length > 0) {
+                const object = intersects[0].object;
+                selectNode(object.userData);
+            }
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            // Slow rotation to grid or stars
+            scene.rotation.y += 0.0003;
+            
+            // Pulsate selected or glowing elements
+            meshes.forEach(mesh => {
+                if (mesh.userData.type === 'desk') {
+                    mesh.rotation.y += 0.01;
+                }
+            });
+
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        // Search feature
+        document.getElementById('search').addEventListener('input', (e) => {
+            const query = e.target.value.toLowerCase();
+            const filtered = nodesData.filter(node => 
+                node.label.toLowerCase().includes(query) || 
+                node.id.toLowerCase().includes(query)
+            );
+            populateSidebar(filtered);
+        });
+
+        // Initialize App
+        init();
+    </script>
+</body>
+</html>

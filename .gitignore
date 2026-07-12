@@ -1,0 +1,24 @@
+# Python / caches
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Databases
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+
+# Secrets / local config
+.env
+*.env
+.env.*
+secrets.*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/

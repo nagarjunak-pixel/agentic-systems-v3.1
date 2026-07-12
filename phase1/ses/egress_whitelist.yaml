@@ -1,0 +1,28 @@
+outbound_network_whitelist:
+  allowed_domains:
+    - github.com
+    - api.github.com
+    - pypi.org
+    - files.pythonhosted.org
+    - registry.npmjs.org
+    - api.openai.com
+    - api.anthropic.com
+    - api.cohere.ai
+    - api.elevenlabs.io
+  allowed_internal_ips:
+    - 10.240.0.0/16 # Internal GPU Cluster subnet (ComfyUI / Local Models)
+    - 10.241.0.0/16 # Central storage subnet (Obsidian markdown files)
+  egress_rules:
+    dns_port: 53
+    http_port: 80
+    https_port: 443
+
+# DNS / Transparent Proxy Implementation Notes (Addresses Domain vs IP Gap):
+# - Egress filters are ultimately applied at the packet level (IP addresses). To map
+#   domain-level whitelists safely, a transparent HTTP/HTTPS proxy and a split-horizon
+#   DNS interceptor run on the host.
+# - Sandbox containers are configured to use the host's DNS proxy as their sole resolver.
+# - The host proxy parses outbound requests, performing SNI (Server Name Indication)
+#   inspection for TLS traffic on port 443, ensuring that even if the sandbox alters
+#   its '/etc/hosts' file or uses raw IP connections, the host proxy blocks unauthorized
+#   domain matches.
