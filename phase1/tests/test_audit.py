@@ -16,6 +16,10 @@ TEMP_AUDIT_ROOT = "/Users/venkataswaraswamy/Desktop/agentic_core/phase1/tests/te
 
 @pytest.fixture(autouse=True)
 def run_around():
+    # Clean BEFORE so the audit logger starts from a fresh index 0
+    # (the logger reconstructs next_index from any existing log file on disk).
+    if os.path.exists(TEMP_AUDIT_ROOT):
+        shutil.rmtree(TEMP_AUDIT_ROOT)
     os.makedirs(TEMP_AUDIT_ROOT, exist_ok=True)
     yield
     if os.path.exists(TEMP_AUDIT_ROOT):
